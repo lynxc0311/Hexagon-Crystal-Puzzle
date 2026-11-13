@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Hexagon Crystal Puzzle</title>
-<meta name="application-version" content="2.0.0">
+<meta name="application-version" content="2.0.1">
 <style>
 :root{
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -298,8 +298,13 @@ select option{background:#151b2c;color:#f3f6ff}
 .stage{isolation:isolate}
 .help-toggle{position:absolute;bottom:5%;right:3%;z-index:10;width:27px;height:27px;border:1px solid rgba(255,234,185,.8);border-radius:50%;color:#ffe6ae;background:rgba(15,22,37,.68);font:700 15px Inter,Arial,sans-serif;cursor:pointer;box-shadow:0 0 9px rgba(213,178,105,.24);pointer-events:auto}
 .help-toggle:hover,.help-toggle:focus-visible{background:rgba(105,76,34,.95);outline:2px solid #ffdc96}
-.help-dialog{position:absolute;right:3%;bottom:calc(5% + 36px);z-index:11;width:min(330px,91%);padding:18px 19px;color:#edf3ff;background:rgba(13,20,34,.95);border:1px solid rgba(245,212,157,.6);border-radius:17px;box-shadow:0 12px 35px rgba(0,0,0,.58);backdrop-filter:blur(15px);font:12px/1.55 Inter,Arial,sans-serif}
-.help-dialog[hidden]{display:none}.help-dialog strong{color:#ffe0a7;letter-spacing:.09em}.help-dialog p{margin:9px 0}.help-dialog b{color:#ffe0a7}.help-close{position:absolute;right:9px;top:7px;border:0;background:transparent;color:white;font-size:23px;cursor:pointer}
+.help-dialog{position:fixed;inset:0;margin:auto;width:min(380px,calc(100% - 28px));max-height:calc(100vh - 28px);max-height:calc(100dvh - 28px);padding:0;color:#edf3ff;background:rgba(13,20,34,.98);border:1px solid rgba(245,212,157,.6);border-radius:20px;box-shadow:0 18px 60px rgba(0,0,0,.65);font:13px/1.65 Inter,Arial,sans-serif;overflow:hidden}
+.help-dialog[open]{display:flex;flex-direction:column}.help-dialog:not([open]){display:none}.help-dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(6px)}
+.help-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 12px 10px 20px;flex-shrink:0;border-bottom:1px solid rgba(245,212,157,.16)}
+.help-header h2{margin:0;font:700 14px/1.4 Inter,Arial,sans-serif;color:#ffe0a7;letter-spacing:.09em}
+.help-body{padding:10px 20px 18px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;min-height:0}.help-body p{margin:10px 0}.help-body b{color:#ffe0a7}
+.help-close{position:static;flex:0 0 44px;width:44px;height:44px;border:0;border-radius:12px;background:rgba(255,255,255,.06);color:#fff;font:26px/1 Arial,sans-serif;cursor:pointer}.help-close:focus-visible{outline:2px solid #ffe0a7;outline-offset:2px}
+.motion-settings[hidden]{display:none}.motion-settings p{margin:10px 0 0;color:#d6deee;font-size:12px;line-height:1.5}.motion-settings .btn{margin-top:10px;width:100%}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Krona+One&display=swap" rel="stylesheet">
 </head>
@@ -308,7 +313,7 @@ select option{background:#151b2c;color:#f3f6ff}
 <div class="app"><header class="poster"><h1>Hexagon Crystal Puzzle</h1></header><main class="layout">
   <div class="cardwrap"><section class="boardbox">
     <span id="pieceCount" hidden></span>
-    <div class="stage" id="stage"><button class="help-toggle" id="howTo" type="button" aria-label="How to play" aria-expanded="false" aria-controls="helpDialog">?</button><section class="help-dialog" id="helpDialog" role="dialog" aria-label="How to play" hidden><button class="help-close" id="helpClose" type="button" aria-label="Close instructions">×</button><strong>HOW TO PLAY</strong><p><b>Left click:</b> Rotate the three crystals 120° clockwise.</p><p><b>Right click</b> or <b>Shift + left click:</b> Rotate 120° counterclockwise.</p><p><b>Double left click:</b> Flip the three crystals over in 3D.</p><p><b>Touch controls:</b> Tap to rotate clockwise, press and hold to rotate counterclockwise, or double-tap to flip.</p><p><b>Hint:</b> Highlights the next pivot and displays the move to make. Availability depends on the difficulty selected in Settings.</p><p><b>Undo</b> reverses your last move within the selected difficulty allowance. <b>Play</b> scrambles the puzzle using reversible moves, so every scramble is solvable.</p></section><canvas id="gl"></canvas><canvas id="glow" width="160" height="160"></canvas><svg id="board" viewBox="-350 -350 700 700" role="group" aria-label="Game board"></svg></div>
+    <div class="stage" id="stage"><button class="help-toggle" id="howTo" type="button" aria-label="How to play" aria-expanded="false" aria-controls="helpDialog">?</button><canvas id="gl"></canvas><canvas id="glow" width="160" height="160"></canvas><svg id="board" viewBox="-350 -350 700 700" role="group" aria-label="Game board"></svg></div>
   </section><div class="flagpill" id="flag">READY</div></div>
   <aside class="panel">
     <div class="tabs"><button data-tab="play" class="on">Play</button><button data-tab="set">⚙ Settings</button></div>
@@ -334,6 +339,11 @@ select option{background:#151b2c;color:#f3f6ff}
       <div class="setting"><label for="size">Board size</label><select id="size"><option value="2">Small · 12 pieces</option><option value="3" selected>Medium · 27 pieces</option><option value="4">Large · 48 pieces</option></select></div>
       <div class="setting"><label for="difficulty">Difficulty</label><select id="difficulty"><option value="relaxed">Relaxed</option><option value="normal" selected>Normal</option><option value="hard">Hard</option><option value="challenge">Challenge</option></select></div>
       <p id="difficultyInfo" class="muted" aria-live="polite"></p>
+      <section id="motionSettings" class="grp motion-settings" hidden>
+        <div class="setting"><label for="motionTilt">Motion tilt</label><input id="motionTilt" type="checkbox" checked></div>
+        <button id="motionCenter" class="btn" type="button">◎ Recenter tilt</button>
+        <p id="motionInfo" role="status" aria-live="polite">Checking device sensors…</p>
+      </section>
       <div class="preset-row"><button class="preset" type="button" data-preset="classic">Gold</button><button class="preset" type="button" data-preset="silver">Silver</button><button class="preset" type="button" data-preset="neon">Crystal</button></div>
       <div id="setUI" class="tabpane"></div>
       <button id="setReset" class="btn" type="button">↺ Restore defaults</button>
@@ -341,6 +351,17 @@ select option{background:#151b2c;color:#f3f6ff}
     <div id="status" hidden role="status" aria-live="polite"></div>
   </aside>
 </main></div>
+<dialog class="help-dialog" id="helpDialog" aria-labelledby="helpTitle">
+  <header class="help-header"><h2 id="helpTitle">HOW TO PLAY</h2><button class="help-close" id="helpClose" type="button" aria-label="Close instructions">×</button></header>
+  <div class="help-body" id="helpBody">
+    <p><b>Goal:</b> Restore the three solid-color faces shown before you press Play.</p>
+    <p><b>Tap a pivot:</b> Rotate its three crystals 120° clockwise.</p>
+    <p><b>Double tap the same pivot:</b> Flip those three crystals. Your first tap waits briefly so a double tap never causes an extra rotation.</p>
+    <p><b>Play:</b> Start a new, solvable shuffle. <b>Reset:</b> Return to the solved board.</p>
+    <p><b>Hint:</b> Follow the highlighted pivot. For <b>TAP ×2</b>, tap once, wait for the rotation to finish, then tap the same pivot again. Hint and Undo allowances depend on Difficulty.</p>
+    <p><b>Motion tilt:</b> On a supported phone, gently tilt the device to move the glass and reflections. Use Settings to turn this effect off or recenter it. Tilting never makes a puzzle move.</p>
+  </div>
+</dialog>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
 (()=>{'use strict';
@@ -381,7 +402,7 @@ const SCHEMA=[
 ['Glass material',[['width','Rim thickness',1.5,7,.1,3.1,1],['opacity','Transparency',.4,1,.01,.95,1],['thick','Block depth',.5,2.5,.05,1,1],['bevel','Edge bevel',.03,.15,.005,.075,1],['ior','Refraction',1.2,2,.01,1.42,1],['rough','Roughness',0,.5,.01,.05,1],['bump','Surface relief',0,3,.05,1,1],['iri','Iridescence',0,1,.05,.4,1],['env','Reflections',0,4,.1,1.8,1],['glow','Core glow',0,2,.05,1,0]]],
 ['Lighting & base',[['expo','Exposure',.5,2,.05,1.15,0],['lcol','Cursor light color','color','#ffe2b0',0],['lint','Cursor light intensity',0,8,.1,3,0],['slab','Base color','color','#07080c',1]]],
 ['Game board',[['stage','Board size (px)',320,760,10,620,0],['fcol','Frame color','color','#e9edf5',0],['fw','Frame thickness',0,16,.5,7,0],['halo','Pivot size',.5,2,.05,1,1],['dot','Pivot color','color','#fffbdf',0]]],
-['Mouse interaction',[['tilt','Tilt (°)',0,20,.5,8,0],['lift','Piece lift',0,40,1,14,0],['liftR','Lift radius',40,300,5,130,0]]],
+['Interaction',[['tilt','Tilt (°)',0,20,.5,8,0],['lift','Piece lift',0,40,1,14,0],['liftR','Lift radius',40,300,5,130,0]]],
 ['Glass card',[['cardRad','Corner radius (px)',12,50,1,34,0],['stripe','Stripe strength',0,.7,.01,.3,0]]],
 ['Animated background',[['bgOn','Enable background','check',1,0],['bgBase','Background base','color','#030304',0],['bgA','Beam color 1','color','#8aa0c8',0],['bgB','Beam color 2','color','#c9b8a6',0],['bgBright','Brightness',0,2.5,.05,.7,0],['bgSpeed','Speed',0,3,.05,1,0],['bgX','Wave density',.2,5,.05,1,0],['bgY','Wave amplitude',.1,1,.01,.5,0],['bgDist','Color split',0,.2,.005,.05,0],['bgMouse','Mouse response',0,1.5,.05,.8,0]]]];
 const flat=SCHEMA.flatMap(g=>g[1]),isRange=it=>typeof it[2]==='number',defOf=it=>isRange(it)?it[5]:it[3];
@@ -494,10 +515,15 @@ function inverseMove(m){return {key:m.key,kind:m.kind,dir:m.kind==='flip'?0:-m.d
 function track(m){
   if(!keepSolution())return;
   const prev=sol[sol.length-1];
-  if(prev&&prev.key===m.key&&prev.kind===m.kind&&
-     (m.kind==='flip'||prev.dir===-m.dir))sol.pop();
-  else sol.push({...m});
+  if(prev&&prev.key===m.key&&prev.kind===m.kind){
+    sol.pop();
+    if(m.kind==='rotate'){
+      const sum=prev.dir+m.dir;
+      if(sum)sol.push({...m,dir:sum===2?-1:sum===-2?1:sum});
+    }
+  }else sol.push({...m});
 }
+
 function flipCluster(c){
   const originals=c.pids.map(i=>pieces[i]);
   const startIndex=c.even?1:0;
@@ -669,9 +695,9 @@ function initGL(){
   root=new THREE.Group();scene.add(root);
   const fit=()=>{const w=stage.clientWidth||600;renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setSize(w,w,false);dirty=true};
   new ResizeObserver(fit).observe(stage);fit();
-  stage.addEventListener('pointermove',e=>{const r=stage.getBoundingClientRect();
+  stage.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse'||motion.active)return;const r=stage.getBoundingClientRect();
     mouse.tx=(e.clientX-r.left)/r.width*700-350;mouse.ty=-((e.clientY-r.top)/r.height*700-350);mouse.in=1;need=performance.now()+2200});
-  stage.addEventListener('pointerleave',()=>{mouse.in=0;need=performance.now()+1500});
+  stage.addEventListener('pointerleave',()=>{if(motion.active)return;mouse.in=0;need=performance.now()+1500});
   requestAnimationFrame(frame);
 }
 function frame(t){
@@ -749,30 +775,13 @@ function draw(){
   const targets=node('g',{'aria-label':'Valid pivot points'});
   for(const c of cs){
     const enabled=!(allowOnlyCenter&&Math.hypot(c.pt.x,c.pt.y)>1);
-    const g=node('g',{class:'target'+(focusKey===c.key?' focus':''),tabindex:enabled?'0':'-1',role:'button','aria-label':'Click rotate, double click flip, right click counterclockwise','aria-disabled':String(!enabled)},targets);
+    const g=node('g',{class:'target'+(focusKey===c.key?' focus':''),tabindex:enabled?'0':'-1',role:'button','aria-label':'Tap to rotate clockwise; double tap to flip','aria-disabled':String(!enabled)},targets);
     const radius=(n===4?17:20)*S.halo;
     node('circle',{cx:c.pt.x,cy:c.pt.y,r:radius,class:'halo',opacity:enabled?1:.15},g);
     if((show||focusKey===c.key)&&enabled) node('circle',{cx:c.pt.x,cy:c.pt.y,r:n===4?4:5,class:'dot'},g);
     g.style.pointerEvents=enabled?'auto':'none';
-    // Defer single clicks so a double click never applies a stray rotation.
-    g.addEventListener('click',e=>{
-      if(g.dataset.longPress==='1'){delete g.dataset.longPress;return}
-      if(e.detail>=2)return;
-      if(pendingClick){clearTimeout(pendingClick.timer);pendingClick=null}
-      const direction=e.shiftKey?-1:1;
-      pendingClick={key:c.key,timer:setTimeout(()=>{pendingClick=null;play(c.key,'rotate',direction)},265)};
-    });
-    g.addEventListener('dblclick',e=>{e.preventDefault();cancelPendingClick();play(c.key,'flip')});
-    g.addEventListener('contextmenu',e=>{e.preventDefault();cancelPendingClick();play(c.key,'rotate',-1)});
-    let pressTimer=null,pressPoint=null;
-    g.addEventListener('pointerdown',e=>{
-      if(e.pointerType==='mouse')return;
-      pressPoint={x:e.clientX,y:e.clientY};clearTimeout(pressTimer);
-      pressTimer=setTimeout(()=>{cancelPendingClick();g.dataset.longPress='1';play(c.key,'rotate',-1);pressTimer=null},540);
-    });
-    g.addEventListener('pointermove',e=>{if(pressPoint&&Math.hypot(e.clientX-pressPoint.x,e.clientY-pressPoint.y)>12){clearTimeout(pressTimer);pressTimer=null}});
-    for(const ev of ['pointerup','pointercancel','pointerleave'])g.addEventListener(ev,()=>{clearTimeout(pressTimer);pressTimer=null;pressPoint=null});
-    g.addEventListener('keydown',e=>{if(['Enter',' ','ArrowRight','ArrowLeft','f','F'].includes(e.key)){e.preventDefault();cancelPendingClick();play(c.key,(e.key==='f'||e.key==='F')?'flip':'rotate',(e.shiftKey||e.key==='ArrowLeft')?-1:1)}});
+    bindPivot(g,c.key);
+
   }
 }
 
@@ -788,7 +797,48 @@ function specPath(points, shimmer, index){
   return `M ${sx.toFixed(2)} ${sy.toFixed(2)} Q ${mx.toFixed(2)} ${my.toFixed(2)} ${ex.toFixed(2)} ${ey.toFixed(2)}`;
 }
 
-let pendingClick=null;
+const DOUBLE_TAP_MS=300;
+let pendingClick=null,touchClickUntil=0;
+function queueTap(k){
+  if(animT||E('helpDialog').open)return;
+  const now=performance.now();
+  if(pendingClick){
+    const prev=pendingClick;cancelPendingClick();
+    if(prev.key===k&&now-prev.started<=DOUBLE_TAP_MS){play(k,'flip');return}
+    play(prev.key,'rotate',1);return;
+  }
+  pendingClick={key:k,started:now,timer:setTimeout(()=>{pendingClick=null;play(k,'rotate',1)},DOUBLE_TAP_MS)};
+}
+function bindPivot(g,k){
+  let press=null;
+  g.addEventListener('click',e=>{
+    e.preventDefault();
+    if(performance.now()<touchClickUntil||e.button>0)return;
+    queueTap(k);
+  });
+  g.addEventListener('dblclick',e=>e.preventDefault());
+  g.addEventListener('contextmenu',e=>e.preventDefault());
+  g.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse'||e.isPrimary===false)return;
+    press={id:e.pointerId,x:e.clientX,y:e.clientY,time:performance.now(),moved:false};
+    g.setPointerCapture?.(e.pointerId);
+  });
+  g.addEventListener('pointermove',e=>{
+    if(press&&press.id===e.pointerId&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>12)press.moved=true;
+  });
+  g.addEventListener('pointerup',e=>{
+    if(!press||press.id!==e.pointerId)return;
+    const tap=press;press=null;touchClickUntil=performance.now()+800;e.preventDefault();
+    if(!tap.moved&&performance.now()-tap.time<450)queueTap(k);
+  });
+  g.addEventListener('pointercancel',()=>{press=null});
+  g.addEventListener('keydown',e=>{
+    if(['Enter',' ','f','F'].includes(e.key)){
+      e.preventDefault();cancelPendingClick();play(k,(e.key==='f'||e.key==='F')?'flip':'rotate',1);
+    }
+  });
+}
+
 function cancelPendingClick(){if(pendingClick){clearTimeout(pendingClick.timer);pendingClick=null}}
 function clock(){return `${String(Math.floor(elapsed/60)).padStart(2,'0')}:${String(elapsed%60).padStart(2,'0')}`}
 function update(){
@@ -894,8 +944,44 @@ function wireTabs(){
   E('setReset').onclick=()=>{difficulty='normal';saveGameSettings();describeDifficulty();E('status').textContent='Defaults restored. Press Play or Reset to apply difficulty.';flat.forEach(it=>S[it[0]]=defOf(it));buildUI();applySet(1)}}
 /* nền GLSL (theo GLSL Sample027) + nghiêng parallax theo chuột (theo pen Halloween) */
 const pm={x:0,y:0,sx:0,sy:0,cx:innerWidth/2,cy:innerHeight/2,mx:0,my:0};
-addEventListener('pointermove',e=>{pm.x=e.clientX/innerWidth*2-1;pm.y=e.clientY/innerHeight*2-1;pm.cx=e.clientX;pm.cy=e.clientY});
-function bgStart(){const c=E('bg'),gl=c.getContext('webgl');if(!gl)return;
+const motion={enabled:true,available:false,active:false,sent:null};
+try{const saved=JSON.parse(localStorage.getItem('hexMotionV1'));if(typeof saved?.enabled==='boolean')motion.enabled=saved.enabled}catch(e){}
+function motionUI(){
+  const native=!!globalThis.HexagonMotion;
+  E('motionSettings').hidden=!native;E('motionTilt').checked=motion.enabled;
+  E('motionTilt').disabled=!motion.available;E('motionCenter').disabled=!motion.available||!motion.enabled;
+  E('motionInfo').textContent=!motion.available?'Motion sensor unavailable. The puzzle still works normally.':motion.enabled?'Gently tilt your phone. Recenter in a comfortable holding position.':'Motion tilt is off.';
+}
+function notifyNativeMotion(recenter=false){
+  const bridge=globalThis.HexagonMotion;
+  if(!bridge||typeof bridge.postMessage!=='function')return;
+  if(recenter){bridge.postMessage(JSON.stringify({type:'recenter'}));return}
+  if(motion.sent===motion.enabled)return;
+  motion.sent=motion.enabled;bridge.postMessage(JSON.stringify({type:'motion-settings',enabled:motion.enabled}));
+}
+function acceptMotion(data){
+  if(!data||typeof data!=='object')return;
+  if(typeof data.available==='boolean'&&data.available!==motion.available){motion.available=data.available;motionUI()}
+  if(!motion.enabled||!motion.available){motion.active=false;return}
+  if(!Number.isFinite(data.x)||!Number.isFinite(data.y))return;
+  const x=Math.max(-1,Math.min(1,data.x)),y=Math.max(-1,Math.min(1,data.y));
+  motion.active=true;pm.x=x;pm.y=y;pm.cx=(x+1)*innerWidth/2;pm.cy=(y+1)*innerHeight/2;
+  mouse.tx=x*230;mouse.ty=-y*230;mouse.in=1;need=performance.now()+200;dirty=true;
+}
+addEventListener('hexagon-motion',e=>acceptMotion(e.detail));
+addEventListener('pointermove',e=>{if(e.pointerType!=='mouse'||motion.active)return;pm.x=e.clientX/innerWidth*2-1;pm.y=e.clientY/innerHeight*2-1;pm.cx=e.clientX;pm.cy=e.clientY});
+
+function bgStart(){
+  motionUI();notifyNativeMotion();
+  let previous='';
+  (function tiltFrame(){
+    requestAnimationFrame(tiltFrame);
+    if(document.hidden)return;
+    pm.sx+=(pm.x-pm.sx)*.07;pm.sy+=(pm.y-pm.sy)*.07;
+    const transform=S.tilt?`perspective(1000px) rotateX(${(-pm.sy*S.tilt).toFixed(2)}deg) rotateY(${(pm.sx*S.tilt).toFixed(2)}deg)`:'';
+    if(transform!==previous){stage.style.transform=transform;previous=transform}
+  })();
+  const c=E('bg'),gl=c.getContext('webgl');if(!gl)return;
   const sh=(t,src)=>{const o=gl.createShader(t);gl.shaderSource(o,src);gl.compileShader(o);return o},pr=gl.createProgram();
   gl.attachShader(pr,sh(gl.VERTEX_SHADER,'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'));
   gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,`precision highp float;uniform vec2 R,M;uniform float T,X,Y,D,B,K;uniform vec3 C0,C1,C2;
@@ -908,9 +994,6 @@ vec3 l=vec3(r,g,b);float L=(r+g+b)/3.;vec3 c=max(C0+B*(L*mix(C1,C2,.5+.5*sin(p.x
   const u=nm=>gl.getUniformLocation(pr,nm),hex=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16)/255),dpr=Math.min(devicePixelRatio||1,1.5);
   let T=0,last=0,prev='';
   (function f(t){requestAnimationFrame(f);
-    pm.sx+=(pm.x-pm.sx)*.07;pm.sy+=(pm.y-pm.sy)*.07;
-    const tr=S.tilt?`perspective(1000px) rotateX(${(-pm.sy*S.tilt).toFixed(2)}deg) rotateY(${(pm.sx*S.tilt).toFixed(2)}deg)`:'';
-    if(tr!==prev){stage.style.transform=tr;prev=tr}
     c.style.display=S.bgOn?'block':'none';if(!S.bgOn||document.hidden){last=t;return}
     const W=c.clientWidth*dpr|0,H=c.clientHeight*dpr|0;if(c.width!==W||c.height!==H){c.width=W;c.height=H}
     gl.viewport(0,0,W,H);last=last||t;T+=(t-last)*.001*S.bgSpeed;last=t;
@@ -919,9 +1002,22 @@ vec3 l=vec3(r,g,b);float L=(r+g+b)/3.;vec3 c=max(C0+B*(L*mix(C1,C2,.5+.5*sin(p.x
     [['T',T],['X',S.bgX],['Y',S.bgY],['D',S.bgDist],['B',S.bgBright],['K',S.bgMouse]].forEach(([k,v])=>gl.uniform1f(u(k),v));
     gl.uniform3fv(u('C0'),hex(S.bgBase).map(x=>x*.6));gl.uniform3fv(u('C1'),hex(S.bgA));gl.uniform3fv(u('C2'),hex(S.bgB));
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4)})(0)}
-E('howTo').onclick=()=>{const d=E('helpDialog');d.hidden=!d.hidden;E('howTo').setAttribute('aria-expanded',String(!d.hidden))};
-E('helpClose').onclick=()=>{E('helpDialog').hidden=true;E('howTo').setAttribute('aria-expanded','false')};
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){E('helpDialog').hidden=true;E('howTo').setAttribute('aria-expanded','false')}});
+E('howTo').onclick=()=>{
+  cancelPendingClick();const d=E('helpDialog');
+  if(d.open)d.close();else{E('helpBody').scrollTop=0;d.showModal();E('howTo').setAttribute('aria-expanded','true')}
+};
+E('helpClose').onclick=()=>E('helpDialog').close();
+E('helpDialog').addEventListener('close',()=>E('howTo').setAttribute('aria-expanded','false'));
+E('helpDialog').addEventListener('click',e=>{
+  const d=E('helpDialog'),r=d.getBoundingClientRect();
+  if(e.target===d&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom))d.close();
+});
+E('motionTilt').onchange=e=>{
+  motion.enabled=e.target.checked;motion.active=false;pm.x=0;pm.y=0;mouse.in=0;
+  try{localStorage.setItem('hexMotionV1',JSON.stringify({enabled:motion.enabled}))}catch(e){}
+  motionUI();notifyNativeMotion();
+};
+E('motionCenter').onclick=()=>{pm.x=0;pm.y=0;notifyNativeMotion(true)};
 E('shuffle').onclick=shuffle;
 E('reset').onclick=()=>initialize(n);
 E('size').onchange=e=>{initialize(+e.target.value);saveGameSettings()};
@@ -938,8 +1034,8 @@ E('hintBtn').onclick=()=>{
   cancelPendingClick();const m=inverseMove(sol[sol.length-1]);
   if(!candidates().some(c=>c.key===m.key))return;
   lastHintState=snapshot();hintsUsed++;focusKey=m.key;draw();
-  E('flag').textContent=m.kind==='flip'?'HINT: FLIP':m.dir===1?'HINT: ↻':'HINT: ↺';
-  E('status').textContent=m.kind==='flip'?'Double-click the highlighted pivot to flip':m.dir===1?'Rotate the highlighted pivot clockwise':'Rotate the highlighted pivot counterclockwise';
+  E('flag').textContent=m.kind==='flip'?'DOUBLE TAP':m.dir===1?'TAP ↻':'TAP ×2 ↻';
+  E('status').textContent=m.kind==='flip'?'Double tap the highlighted pivot to flip':m.dir===1?'Tap the highlighted pivot once':'Tap once, wait for the rotation to finish, then tap the same pivot again';
   if(!keepSolution())clearSolutionTrail();update();
 };
 E('showTargets').onclick=()=>{show=!show; draw()};

@@ -14,6 +14,9 @@ with zipfile.ZipFile(apk_path) as apk:
         assert required in apk.namelist(), required
     for relative, (_, expected) in DEPENDENCIES.items():
         assert sha256(apk.read('assets/' + relative)) == expected, relative
+    icon = [name for name in apk.namelist() if name.endswith('/launcher_crystal.webp')]
+    assert len(icon) == 1, 'Reference-based launcher icon is missing'
+    assert b'HexagonMotion' in apk.read('classes.dex'), 'Motion sensor bridge is missing'
     html = apk.read('assets/index.html').decode('utf-8')
     verify_html(html)
     assert apk.read('assets/index.html') == (ASSETS / 'index.html').read_bytes()

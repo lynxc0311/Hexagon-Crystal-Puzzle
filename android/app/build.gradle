@@ -10,8 +10,8 @@ android {
         applicationId 'vn.lynxc.hexagon'
         minSdk 26
         targetSdk 35
-        versionCode 20001
-        versionName '2.0.0-android.1'
+        versionCode 20002
+        versionName '2.0.1-android.2'
     }
 
     compileOptions {
@@ -22,6 +22,7 @@ android {
 
 dependencies {
     implementation 'androidx.webkit:webkit:1.12.1'
+    testImplementation 'junit:junit:4.13.2'
 }
 
 tasks.register('prepareWebAssets', Exec) {

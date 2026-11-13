@@ -13,7 +13,7 @@ Choose **Settings → Difficulty**, then **Play** to start a new puzzle. **Reset
 | Hard | 1 | 5 | Best of 6 longer legal walks |
 | Challenge | Disabled | Disabled | Best of 9 longer legal walks |
 
-The original target, board layout, glass rendering, rotation, flip, keyboard and touch controls are preserved. Hints highlight a pivot and indicate clockwise, counterclockwise or flip. A repeated request on the same unchanged state does not consume another hint. Undo never refunds assistance already used.
+The original target, board layout and glass rendering are preserved. Tap/click rotates a pivot clockwise; double tap/click flips it. Long press, right click and Shift no longer rotate counterclockwise. A hint that needs the inverse rotation uses two separate clockwise taps, waiting for each rotation to finish. Hints highlight a pivot and indicate clockwise, counterclockwise or flip. A repeated request on the same unchanged state does not consume another hint. Undo never refunds assistance already used.
 
 Scrambles use legal reversible moves, reject already visited board states, and rank candidate boards by color displacement and piece pairing changes. This is a difficulty heuristic, not a minimum-move guarantee; a small board can still be simple at a high setting. Random choices use `crypto.getRandomValues` when available.
 
@@ -40,7 +40,10 @@ GitHub Pages continues to serve the root `index.html`; no build step is required
 An Android wrapper is provided in `android/`. It uses the same root `index.html`, including the difficulty settings, and bundles Three.js plus the original Krona One font for offline use. It does not change the GitHub Pages game.
 
 - Android 8.0 or newer; a current Android System WebView with WebGL support is required.
-- Fullscreen display, portrait/landscape support, and existing touch controls.
+- Fullscreen display and portrait/landscape support. Tap to rotate clockwise; double tap to flip.
+- Scrollable instructions open above the board in a modal, so the glass frame cannot clip them.
+- Optional motion tilt uses a game rotation vector (or rotation vector fallback), calibrated to your holding position. Settings offers a Motion tilt switch and Recenter tilt. Screen rotation remaps the sensor axes and recenters the effect. Sensor listeners stop when the app is paused or motion tilt is disabled. Devices without supported sensors can still play normally.
+- The launcher icon follows the supplied pink/green/cyan glass-cube reference with a silver rim and an adaptive-icon safe area.
 - Settings persist in app-local storage. They are separate from browser settings; unfinished rounds are not saved across process termination.
 - No internet or storage permission is requested. All game resources ship inside the APK.
 - This initial APK is debug-signed for sideload testing. It is not a Google Play release. CI debug signing keys can differ between builds, which can require uninstalling an earlier test version before installing another; uninstalling clears app-local settings. Production updates should use a private, stable release signing key.
@@ -55,8 +58,8 @@ Install Android SDK platform 35/build-tools 35.0.0, JDK 17, Gradle 8.11.1 and Py
 
 ```sh
 node tests/puzzle.test.cjs
-gradle -p android assembleDebug lintDebug
+gradle -p android assembleDebug testDebugUnitTest lintDebug
 python3 android/check_apk.py android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The first build downloads pinned dependencies and verifies SHA-256 digests. `android/prepare_assets.py --offline` works after those dependencies are present. APK signature and bundled-content checks also run in GitHub Actions. Actual installation, GPU behavior and device gestures still need testing on an Android device.
+The first build downloads pinned dependencies and verifies SHA-256 digests. `android/prepare_assets.py --offline` works after those dependencies are present. Relative sensor math unit tests, APK signature and bundled-content checks also run in GitHub Actions. Actual installation, GPU behavior and device gestures still need testing on an Android device.

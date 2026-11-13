@@ -20,7 +20,7 @@ function harness(savedPreference) {
     if (!elements.has(id)) elements.set(id, {
       textContent: '', value: '', disabled: false, hidden: false,
       style: { setProperty() {} }, classList: { add() {}, remove() {} },
-      getContext() { return {}; }, setAttribute() {}
+      getContext() { return {}; }, setAttribute() {}, addEventListener() {}
     });
     return elements.get(id);
   }
@@ -39,7 +39,9 @@ function harness(savedPreference) {
     flipCluster=c=>{const from=snapshot();originalFlip(c);if(edges&&!edges.has(snapshot()))edges.set(snapshot(),{from,move:{key:c.key,kind:'flip',dir:0}})};
     globalThis.api={
       init:(mode,size)=>{difficulty=mode;initialize(size)},
-      load:()=>initialize(n), shuffle,play,candidates,snapshot,inverseMove,
+      load:()=>initialize(n), shuffle,play,candidates,snapshot,inverseMove,bindPivot,queueTap,acceptMotion,
+      motionState:()=>({enabled:motion.enabled,active:motion.active,available:motion.available,x:pm.x,y:pm.y}),
+      captureInput:()=>{const actions=[];play=(...args)=>actions.push(args);return actions},
       solution:()=>sol.map(m=>({...m})), initial:()=>initial,
       click:id=>E(id).onclick(),
       preference:v=>E('difficulty').onchange({target:{value:v}}),
@@ -152,6 +154,55 @@ function checkPieces(api, size) {
   assert.equal(a.state().history.length, 0);
   assert.equal(elements.get('hintBtn').disabled, true);
 
+  // Clockwise-only gestures still solve a counterclockwise hint in two taps.
+  a.init('relaxed', 3);
+  const center = a.candidates().find(p => Math.hypot(p.pt.x, p.pt.y) < 1);
+  a.play(center.key, 'rotate', 1); a.click('hintBtn');
+  assert.equal(elements.get('flag').textContent, 'TAP ×2 ↻');
+  a.play(center.key, 'rotate', 1); a.play(center.key, 'rotate', 1);
+  assert.equal(a.snapshot(), a.initial());
+  assert.equal(a.solution().length, 0, 'Three clockwise moves cancel in the hint trail');
+  for (const size of [2, 3, 4]) {
+    a.init('relaxed', size); a.shuffle();
+    let guard = 2000;
+    while (a.snapshot() !== a.initial() && guard-- > 0) {
+      const route = a.solution(); assert.ok(route.length);
+      const move = a.inverseMove(route[route.length - 1]);
+      if (move.kind === 'flip') a.play(move.key, 'flip');
+      else a.play(move.key, 'rotate', 1);
+    }
+    assert.ok(guard > 0, 'Clockwise and flip route must terminate');
+  }
+
+  const beforeMotion = a.snapshot();
+  a.acceptMotion({available:true,x:4,y:-3});
+  assert.equal(a.motionState().x,1); assert.equal(a.motionState().y,-1);
+  assert.equal(a.snapshot(),beforeMotion,'Sensor input must never move a puzzle piece');
+  a.acceptMotion({x:NaN,y:0}); assert.equal(a.motionState().x,1);
+  elements.get('motionTilt').onchange({target:{checked:false}});
+  a.acceptMotion({x:.8,y:.9}); assert.equal(a.motionState().x,0); assert.equal(a.motionState().active,false);
+
+  const gestureHarness = harness();
+  const actions = gestureHarness.api.captureInput();
+  const listeners = new Map();
+  const pivot = {addEventListener:(name,fn)=>listeners.set(name,fn),setPointerCapture(){}};
+  gestureHarness.api.bindPivot(pivot,'pivot');
+  const fire=(name,extra={})=>listeners.get(name)({preventDefault(){},pointerType:'touch',isPrimary:true,pointerId:1,clientX:20,clientY:20,...extra});
+  fire('pointerdown');fire('pointerup');fire('click',{button:0});
+  assert.equal(actions.length,0,'A single touch must wait for a possible double tap');
+  await new Promise(resolve=>setTimeout(resolve,330));
+  assert.deepEqual(JSON.parse(JSON.stringify(actions[0])),['pivot','rotate',1]);
+  actions.length=0;
+  fire('pointerdown');fire('pointerup');fire('pointerdown');fire('pointerup');
+  fire('dblclick');
+  await new Promise(resolve=>setTimeout(resolve,330));
+  assert.equal(actions.length,1);assert.deepEqual(JSON.parse(JSON.stringify(actions[0])),['pivot','flip']);
+  actions.length=0;
+  fire('pointerdown');fire('pointermove',{clientX:80});fire('pointerup',{clientX:80});
+  await new Promise(resolve=>setTimeout(resolve,330));assert.equal(actions.length,0,'Dragging is not a tap');
+  fire('contextmenu');assert.equal(actions.length,0,'Right click cannot rotate counterclockwise');
+  fire('keydown',{key:'Enter',shiftKey:true});assert.deepEqual(JSON.parse(JSON.stringify(actions[0])),['pivot','rotate',1]);
+
   for (const saved of ['broken JSON', 'null', '{"mode":"__proto__","size":999}']) {
     const { api } = harness(saved); api.load();
     assert.equal(api.state().selected, 'normal'); assert.equal(api.state().size, 3);
@@ -159,5 +210,5 @@ function checkPieces(api, size) {
   const { api: restored } = harness('{"mode":"hard","size":4}'); restored.load();
   assert.equal(restored.state().mode, 'Hard'); assert.equal(restored.state().size, 4);
 
-  console.log(JSON.stringify({ passed: true, boards, modes: 4, sizes: 3, maxGenerationMs: Math.round(maxGenerationMs), checks: ['syntax', 'all-mode reachability', 'piece partition', 'mixed rotate and flip', 'hint limits', 'undo limits', 'solution deletion', 'round isolation', 'animation guard', 'reset cancellation', 'saved preference validation'] }));
+  console.log(JSON.stringify({ passed: true, boards, modes: 4, sizes: 3, maxGenerationMs: Math.round(maxGenerationMs), checks: ['syntax', 'all-mode reachability', 'piece partition', 'mixed rotate and flip', 'hint limits', 'undo limits', 'solution deletion', 'round isolation', 'animation guard', 'reset cancellation', 'saved preference validation', 'clockwise-only solution', 'touch and ghost-click handling', 'motion clamp and isolation'] }));
 })().catch(error => { console.error(error); process.exitCode = 1; });

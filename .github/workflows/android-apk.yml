@@ -32,18 +32,18 @@ jobs:
       - name: Prepare Android SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build and lint installable APK
-        run: gradle -p android --no-daemon assembleDebug lintDebug
+        run: gradle -p android --no-daemon assembleDebug testDebugUnitTest lintDebug
       - name: Verify APK signature and bundled assets
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
           python3 android/check_apk.py android/app/build/outputs/apk/debug/app-debug.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk Hexagon-Crystal-Puzzle-2.0.0-android.1.apk
-          sha256sum Hexagon-Crystal-Puzzle-2.0.0-android.1.apk > SHA256SUMS.txt
+          cp android/app/build/outputs/apk/debug/app-debug.apk Hexagon-Crystal-Puzzle-2.0.1-android.2.apk
+          sha256sum Hexagon-Crystal-Puzzle-2.0.1-android.2.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: Hexagon-Crystal-Puzzle-APK
           path: |
-            Hexagon-Crystal-Puzzle-2.0.0-android.1.apk
+            Hexagon-Crystal-Puzzle-2.0.1-android.2.apk
             SHA256SUMS.txt
           retention-days: 30
       - name: Keep lint report
