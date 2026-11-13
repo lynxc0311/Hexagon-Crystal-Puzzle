@@ -126,7 +126,9 @@ function checkPieces(api, size) {
 
   a.init('normal', 3); a.shuffle(); a.click('hintBtn'); a.click('hintBtn');
   assert.equal(a.state().hintsUsed, 1, 'Repeated hint on an unchanged board is not charged twice');
-  for (let i = 0; i < 7; i++) { a.play(a.candidates()[0].key); a.click('hintBtn'); }
+  // A flip changes piece pairings; rotating a monochrome cluster can leave
+  // the visible state unchanged and correctly refuse another hint.
+  for (let i = 0; i < 7; i++) { a.play(a.candidates()[0].key, 'flip'); a.click('hintBtn'); }
   assert.equal(a.state().hintsUsed, 5);
   assert.equal(a.solution().length, 0);
 

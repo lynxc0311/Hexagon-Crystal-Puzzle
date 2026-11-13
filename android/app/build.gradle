@@ -1,0 +1,35 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'vn.lynxc.hexagon'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'vn.lynxc.hexagon'
+        minSdk 26
+        targetSdk 35
+        versionCode 20001
+        versionName '2.0.0-android.1'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
+
+tasks.register('prepareWebAssets', Exec) {
+    workingDir rootProject.projectDir
+    commandLine 'python3', 'prepare_assets.py'
+    inputs.file rootProject.file('../index.html')
+    inputs.file rootProject.file('prepare_assets.py')
+    inputs.dir rootProject.file('licenses')
+    outputs.dir file('src/main/assets')
+}
+tasks.named('preBuild').configure { dependsOn 'prepareWebAssets' }

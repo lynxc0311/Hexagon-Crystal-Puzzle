@@ -1,0 +1,8 @@
+# Android local tools, generated assets and outputs
+android/.gradle/
+android/local.properties
+android/**/build/
+android/app/src/main/assets/
+*.apk
+*.aab
+__pycache__/

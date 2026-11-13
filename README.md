@@ -34,3 +34,29 @@ node tests/puzzle.test.cjs
 The dependency-free test harness exercises the actual inline game logic with rendering stubbed out. It checks 96 scrambles across all modes and sizes, inverse reachability (including Challenge through test-only observation), mixed user moves, hint/undo budgets, route deletion, setting isolation, animation input guards, reset cancellation, and saved settings validation. WebGL rendering still requires browser verification.
 
 GitHub Pages continues to serve the root `index.html`; no build step is required.
+
+## Android APK
+
+An Android wrapper is provided in `android/`. It uses the same root `index.html`, including the difficulty settings, and bundles Three.js plus the original Krona One font for offline use. It does not change the GitHub Pages game.
+
+- Android 8.0 or newer; a current Android System WebView with WebGL support is required.
+- Fullscreen display, portrait/landscape support, and existing touch controls.
+- Settings persist in app-local storage. They are separate from browser settings; unfinished rounds are not saved across process termination.
+- No internet or storage permission is requested. All game resources ship inside the APK.
+- This initial APK is debug-signed for sideload testing. It is not a Google Play release. CI debug signing keys can differ between builds, which can require uninstalling an earlier test version before installing another; uninstalling clears app-local settings. Production updates should use a private, stable release signing key.
+
+### Download and install
+
+Open **Actions → Android APK → latest successful run → Hexagon-Crystal-Puzzle-APK**. Extract the ZIP and transfer the `.apk` to the phone. Open it in the phone's file manager and, if prompted, allow that file manager to install unknown apps. Revoke that allowance afterward if desired. No Play Store publication is needed.
+
+### Build locally
+
+Install Android SDK platform 35/build-tools 35.0.0, JDK 17, Gradle 8.11.1 and Python 3. From the repository root:
+
+```sh
+node tests/puzzle.test.cjs
+gradle -p android assembleDebug lintDebug
+python3 android/check_apk.py android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+The first build downloads pinned dependencies and verifies SHA-256 digests. `android/prepare_assets.py --offline` works after those dependencies are present. APK signature and bundled-content checks also run in GitHub Actions. Actual installation, GPU behavior and device gestures still need testing on an Android device.
