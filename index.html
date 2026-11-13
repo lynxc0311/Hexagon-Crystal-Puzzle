@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Hexagon Crystal Puzzle</title>
+<meta name="application-version" content="2.0.0">
 <style>
 :root{
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -307,7 +308,7 @@ select option{background:#151b2c;color:#f3f6ff}
 <div class="app"><header class="poster"><h1>Hexagon Crystal Puzzle</h1></header><main class="layout">
   <div class="cardwrap"><section class="boardbox">
     <span id="pieceCount" hidden></span>
-    <div class="stage" id="stage"><button class="help-toggle" id="howTo" type="button" aria-label="How to play" aria-expanded="false" aria-controls="helpDialog">?</button><section class="help-dialog" id="helpDialog" role="dialog" aria-label="How to play" hidden><button class="help-close" id="helpClose" type="button" aria-label="Close instructions">×</button><strong>HOW TO PLAY</strong><p><b>Left click:</b> Rotate the three crystals 120° clockwise.</p><p><b>Right click</b> or <b>Shift + left click:</b> Rotate 120° counterclockwise.</p><p><b>Double left click:</b> Flip the three crystals over in 3D.</p><p><b>Touch controls:</b> Tap to rotate clockwise, press and hold to rotate counterclockwise, or double-tap to flip.</p><p><b>Hint:</b> Highlights the next pivot and displays the move to make. Repeat to solve the puzzle.</p><p><b>Undo</b> reverses your last move. <b>Play</b> scrambles the puzzle using reversible moves, so every scramble is solvable.</p></section><canvas id="gl"></canvas><canvas id="glow" width="160" height="160"></canvas><svg id="board" viewBox="-350 -350 700 700" role="group" aria-label="Game board"></svg></div>
+    <div class="stage" id="stage"><button class="help-toggle" id="howTo" type="button" aria-label="How to play" aria-expanded="false" aria-controls="helpDialog">?</button><section class="help-dialog" id="helpDialog" role="dialog" aria-label="How to play" hidden><button class="help-close" id="helpClose" type="button" aria-label="Close instructions">×</button><strong>HOW TO PLAY</strong><p><b>Left click:</b> Rotate the three crystals 120° clockwise.</p><p><b>Right click</b> or <b>Shift + left click:</b> Rotate 120° counterclockwise.</p><p><b>Double left click:</b> Flip the three crystals over in 3D.</p><p><b>Touch controls:</b> Tap to rotate clockwise, press and hold to rotate counterclockwise, or double-tap to flip.</p><p><b>Hint:</b> Highlights the next pivot and displays the move to make. Availability depends on the difficulty selected in Settings.</p><p><b>Undo</b> reverses your last move within the selected difficulty allowance. <b>Play</b> scrambles the puzzle using reversible moves, so every scramble is solvable.</p></section><canvas id="gl"></canvas><canvas id="glow" width="160" height="160"></canvas><svg id="board" viewBox="-350 -350 700 700" role="group" aria-label="Game board"></svg></div>
   </section><div class="flagpill" id="flag">READY</div></div>
   <aside class="panel">
     <div class="tabs"><button data-tab="play" class="on">Play</button><button data-tab="set">⚙ Settings</button></div>
@@ -331,11 +332,13 @@ select option{background:#151b2c;color:#f3f6ff}
     </div>
     <div id="tabSet" class="tabpane" hidden>
       <div class="setting"><label for="size">Board size</label><select id="size"><option value="2">Small · 12 pieces</option><option value="3" selected>Medium · 27 pieces</option><option value="4">Large · 48 pieces</option></select></div>
+      <div class="setting"><label for="difficulty">Difficulty</label><select id="difficulty"><option value="relaxed">Relaxed</option><option value="normal" selected>Normal</option><option value="hard">Hard</option><option value="challenge">Challenge</option></select></div>
+      <p id="difficultyInfo" class="muted" aria-live="polite"></p>
       <div class="preset-row"><button class="preset" type="button" data-preset="classic">Gold</button><button class="preset" type="button" data-preset="silver">Silver</button><button class="preset" type="button" data-preset="neon">Crystal</button></div>
       <div id="setUI" class="tabpane"></div>
       <button id="setReset" class="btn" type="button">↺ Restore defaults</button>
     </div>
-    <div id="status" hidden></div>
+    <div id="status" hidden role="status" aria-live="polite"></div>
   </aside>
 </main></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
@@ -343,6 +346,27 @@ select option{background:#151b2c;color:#f3f6ff}
 (()=>{'use strict';
 const NS='http://www.w3.org/2000/svg', svg=document.getElementById('board'), E=id=>document.getElementById(id);
 let n=3, tri=[], pieces=[], initial='', history=[], steps=0, elapsed=0, start=0, timer=null, show=true, focusKey=null, allowOnlyCenter=true, sol=[];
+let hintsUsed=0, undosUsed=0, roundActive=false, lastHintState=null;
+const DIFFICULTIES=Object.freeze({
+  relaxed:Object.freeze({label:"Relaxed",hints:Infinity,undos:Infinity,walk:10,trials:1,keepTrail:true}),
+  normal:Object.freeze({label:"Normal",hints:5,undos:Infinity,walk:24,trials:3,keepTrail:true}),
+  hard:Object.freeze({label:"Hard",hints:1,undos:5,walk:40,trials:6,keepTrail:true}),
+  challenge:Object.freeze({label:"Challenge",hints:0,undos:0,walk:56,trials:9,keepTrail:false})
+});
+let difficulty="normal";
+try{const saved=JSON.parse(localStorage.getItem("hexDifficultyV2"));if(saved&&Object.hasOwn(DIFFICULTIES,saved.mode))difficulty=saved.mode;if(saved&&[2,3,4].includes(saved.size))n=saved.size}catch(e){}
+let roundRules=DIFFICULTIES[difficulty];
+const clonePieces=ps=>ps.map(p=>({...p,ids:[...p.ids]}));
+function randomIndex(length){
+  if(length<2)return 0;
+  if(globalThis.crypto?.getRandomValues){const a=new Uint32Array(1),limit=Math.floor(4294967296/length)*length;do{crypto.getRandomValues(a)}while(a[0]>=limit);return a[0]%length}
+  return Math.floor(Math.random()*length);
+}
+function saveGameSettings(){try{localStorage.setItem("hexDifficultyV2",JSON.stringify({mode:difficulty,size:n}))}catch(e){}}
+function describeDifficulty(){const r=DIFFICULTIES[difficulty],q=x=>x===Infinity?"unlimited":x;E("difficulty").value=difficulty;E("size").value=n;E("difficultyInfo").textContent=`${r.label} · Hint: ${q(r.hints)} · Undo: ${q(r.undos)}. Applies to a new board. Board size stays independent.`}
+function keepSolution(){return roundRules.keepTrail&&hintsUsed<roundRules.hints}
+function clearSolutionTrail(){sol=[];for(const h of history)h.s=[]}
+
 const key=p=>`${Math.round(p.x*1000)},${Math.round(p.y*1000)}`,
       fmt=p=>`${p.x.toFixed(3)},${p.y.toFixed(3)}`,
       add=(a,b)=>({x:a.x+b.x,y:a.y+b.y}),
@@ -404,6 +428,8 @@ const COLOR_FAMILIES=[
 ];
 
 function initialize(size){
+  cancelPendingClick();anim=null;animT=null;
+  hintsUsed=0;undosUsed=0;roundActive=false;lastHintState=null;roundRules=DIFFICULTIES[difficulty];
   n=size; history=[]; sol=[]; steps=0; elapsed=0; start=0; clearInterval(timer); timer=null; focusKey=null; allowOnlyCenter=true; E('shuffle').classList.remove('on');
   const R=290, V=Array.from({length:6},(_,i)=>({x:R*Math.cos((-90+i*60)*Math.PI/180),y:R*Math.sin((-90+i*60)*Math.PI/180)}));
   let triangleMap=new Map(), temp=[];
@@ -421,6 +447,7 @@ function initialize(size){
   }
   pieces=temp.map(decorate);
   initial=snapshot();
+  describeDifficulty();
   E('pieceCount').textContent=pieces.length+' rhombus pieces';
   E('flag').textContent='READY';
   E('status').textContent='';
@@ -461,10 +488,11 @@ function decorate(p){
   p.variant=h%4; p.shimmer=h%360;
   return p;
 }
-/* All legal moves are recorded. Hint follows the exact inverse solution,
-   including an involutive flip; scramble is therefore provably reversible. */
+/* Assisted modes record reversible moves only while hints remain.
+   Challenge never records a solution. Every scramble uses legal moves. */
 function inverseMove(m){return {key:m.key,kind:m.kind,dir:m.kind==='flip'?0:-m.dir}}
 function track(m){
+  if(!keepSolution())return;
   const prev=sol[sol.length-1];
   if(prev&&prev.key===m.key&&prev.kind===m.kind&&
      (m.kind==='flip'||prev.dir===-m.dir))sol.pop();
@@ -763,33 +791,81 @@ function specPath(points, shimmer, index){
 let pendingClick=null;
 function cancelPendingClick(){if(pendingClick){clearTimeout(pendingClick.timer);pendingClick=null}}
 function clock(){return `${String(Math.floor(elapsed/60)).padStart(2,'0')}:${String(elapsed%60).padStart(2,'0')}`}
-function update(){E('moves').textContent=steps; E('clock').textContent=clock(); E('undo').disabled=!history.length; E('hintBtn').disabled=!sol.length}
+function update(){
+  E('moves').textContent=steps; E('clock').textContent=clock();
+  const hu=roundRules.hints===Infinity?Infinity:Math.max(0,roundRules.hints-hintsUsed);
+  const uu=roundRules.undos===Infinity?Infinity:Math.max(0,roundRules.undos-undosUsed);
+  E('undo').disabled=!history.length||uu===0;
+  E('hintBtn').disabled=!roundActive||!sol.length||hu===0||lastHintState===snapshot();
+  E('hintBtn').textContent=hu===Infinity?'✧ Hint':`✧ Hint (${hu})`;
+  E('undo').textContent=uu===Infinity?'↶ Undo':`↶ Undo (${uu})`;
+  E('hintBtn').title=hu===0?'No hints available at this difficulty':lastHintState===snapshot()?'Make a move before requesting another hint':'Show the next move';
+  E('undo').title=uu===0?'No undos available at this difficulty':'Reverse the last move';
+}
 
 function play(k,kind='rotate',dir=1){
   const c=candidates().find(x=>x.key===k);if(!c||animT)return;
   if(allowOnlyCenter&&Math.hypot(c.pt.x,c.pt.y)>1)return;
   if(!start){start=Date.now()-elapsed*1000;timer=setInterval(()=>{elapsed=Math.floor((Date.now()-start)/1000);update()},250)}
-  const saved=pieces.map(p=>({...p,ids:[...p.ids]}));
-  history.push({p:saved,s:sol.map(x=>({...x}))});
+  if(roundRules.undos>undosUsed){
+    history.push({p:clonePieces(pieces),s:keepSolution()?sol.map(x=>({...x})):[]});
+    if(roundRules.undos!==Infinity&&history.length>roundRules.undos-undosUsed)history.shift();
+  }
   if(kind==='flip'){flipCluster(c);anim={pt:c.pt,kind:'flip'}}
   else {rotateCluster(c,dir);anim={pt:c.pt,kind:'rotate',dir}}
   track({key:c.key,kind,dir:kind==='flip'?0:dir});
-  allowOnlyCenter=false;steps++;focusKey=null;draw();update();
+  allowOnlyCenter=false;steps++;focusKey=null;roundActive=snapshot()!==initial;draw();update();
   E('flag').textContent='PLAYING';E('status').textContent='';
   if(snapshot()===initial){clearInterval(timer);timer=null;start=0;E('flag').textContent='SOLVED ✓';E('shuffle').classList.remove('on')}
 }
+// A legal random walk proves reachability. Rank candidates by a heuristic,
+// never by a claimed minimum solution length. Keep presentation and rules intact.
+function boardScore(goal){
+  let wrong=0,shape=0;const occupancy=new Map();
+  for(const p of goal)for(const id of p.ids)occupancy.set(id,p);
+  for(const p of pieces){const a=occupancy.get(p.ids[0]),b=occupancy.get(p.ids[1]);
+    wrong+=(a.color!==p.color)+(b.color!==p.color);
+    if(a!==b)shape++;
+  }
+  return wrong+shape*.8;
+}
+function generateScramble(goal,rules){
+  let best=null;
+  for(let trial=0;trial<rules.trials;trial++){
+    pieces=clonePieces(goal);sol=[];
+    const visited=new Set([snapshot()]);let last='';
+    const total=n*rules.walk+randomIndex(n*4+1);
+    for(let i=0;i<total;i++){
+      const all=candidates(),different=all.filter(c=>c.key!==last),pool=different.length?different:all;
+      if(!pool.length)break;
+      let accepted=false;
+      for(let retry=0;retry<8;retry++){
+        const c=pool[randomIndex(pool.length)],kind=randomIndex(3)===0?'flip':'rotate',dir=randomIndex(2)?1:-1;
+        const before=clonePieces(pieces);
+        if(kind==='flip')flipCluster(c);else rotateCluster(c,dir);
+        const state=snapshot();
+        if(visited.has(state)){pieces=before;continue}
+        visited.add(state);track({key:c.key,kind,dir:kind==='flip'?0:dir});last=c.key;accepted=true;break;
+      }
+      if(!accepted)break;
+    }
+    if(snapshot()===initial)continue;
+    const score=boardScore(goal);
+    if(!best||score>best.score)best={p:clonePieces(pieces),s:sol.map(m=>({...m})),score};
+  }
+  if(!best){
+    pieces=clonePieces(goal);sol=[];
+    const c=candidates().find(c=>Math.hypot(c.pt.x,c.pt.y)<1)||candidates()[0];
+    if(c){rotateCluster(c,1);track({key:c.key,kind:'rotate',dir:1})}
+    best={p:clonePieces(pieces),s:sol.map(m=>({...m})),score:boardScore(goal)};
+  }
+  pieces=best.p;sol=rules.keepTrail?best.s:[];
+}
 function shuffle(){
   cancelPendingClick();initialize(n);
-  let last='',total=n*24;
-  for(let i=0;i<total+300&&(i<total||snapshot()===initial);i++){
-    const cs=candidates();if(!cs.length)break;
-    const choices=cs.filter(c=>c.key!==last),pool=choices.length?choices:cs;
-    const c=pool[Math.floor(Math.random()*pool.length)];
-    const kind=Math.random()<.34?'flip':'rotate',dir=Math.random()<.5?1:-1;
-    if(kind==='flip')flipCluster(c);else rotateCluster(c,dir);
-    track({key:c.key,kind,dir:kind==='flip'?0:dir});last=c.key;
-  }
-  allowOnlyCenter=false;history=[];steps=0;elapsed=0;start=0;focusKey=null;
+  const goal=clonePieces(pieces);
+  generateScramble(goal,roundRules);
+  allowOnlyCenter=false;history=[];steps=0;elapsed=0;start=0;focusKey=null;roundActive=snapshot()!==initial;
   anim=null;animT=null;draw();update();E('shuffle').classList.add('on');
   E('flag').textContent='SHUFFLED';E('status').textContent='';
 }
@@ -815,7 +891,7 @@ function wireTabs(){
     E('tabPlay').hidden=b.dataset.tab!=='play';E('tabSet').hidden=b.dataset.tab!=='set'});
   const presets={classic:{c0:'#ffce36',c1:'#19c7bb',c2:'#eb3547',rim:'#c69a58'},silver:{c0:'#80c9fc',c1:'#9be4b0',c2:'#b28bea',rim:'#b0bbc7'},neon:{c0:'#ffc64c',c1:'#1ce5d5',c2:'#ff59b0',rim:'#e7eff3'}};
   document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{Object.assign(S,presets[b.dataset.preset]);buildUI();applySet(1)});
-  E('setReset').onclick=()=>{flat.forEach(it=>S[it[0]]=defOf(it));buildUI();applySet(1)}}
+  E('setReset').onclick=()=>{difficulty='normal';saveGameSettings();describeDifficulty();E('status').textContent='Defaults restored. Press Play or Reset to apply difficulty.';flat.forEach(it=>S[it[0]]=defOf(it));buildUI();applySet(1)}}
 /* nền GLSL (theo GLSL Sample027) + nghiêng parallax theo chuột (theo pen Halloween) */
 const pm={x:0,y:0,sx:0,sy:0,cx:innerWidth/2,cy:innerHeight/2,mx:0,my:0};
 addEventListener('pointermove',e=>{pm.x=e.clientX/innerWidth*2-1;pm.y=e.clientY/innerHeight*2-1;pm.cx=e.clientX;pm.cy=e.clientY});
@@ -848,11 +924,26 @@ E('helpClose').onclick=()=>{E('helpDialog').hidden=true;E('howTo').setAttribute(
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){E('helpDialog').hidden=true;E('howTo').setAttribute('aria-expanded','false')}});
 E('shuffle').onclick=shuffle;
 E('reset').onclick=()=>initialize(n);
-E('size').onchange=e=>initialize(+e.target.value);
-E('undo').onclick=()=>{if(!history.length)return; {const h=history.pop(); sol=h.s; anim=null;animT=null;restore(h.p);} steps=Math.max(0,steps-1); allowOnlyCenter=false; focusKey=null; draw(); update(); E('status').textContent=''};
-E('hintBtn').onclick=()=>{if(!sol.length)return; const m=inverseMove(sol[sol.length-1]);focusKey=m.key;draw();E('flag').textContent=m.kind==='flip'?'HINT: FLIP':m.dir===1?'HINT: ↻':'HINT: ↺';E('status').textContent=m.kind==='flip'?'Double-click the highlighted pivot to flip':m.dir===1?'Rotate the highlighted pivot clockwise':'Rotate the highlighted pivot counterclockwise'};
+E('size').onchange=e=>{initialize(+e.target.value);saveGameSettings()};
+E('difficulty').onchange=e=>{difficulty=e.target.value;describeDifficulty();saveGameSettings();E('status').textContent='Difficulty saved. Press Play or Reset to apply to a new board.'};
+E('undo').onclick=()=>{
+  if(!history.length||undosUsed>=roundRules.undos||animT)return;
+  cancelPendingClick();const h=history.pop();undosUsed++;
+  sol=keepSolution()?h.s:[];anim=null;animT=null;pieces=clonePieces(h.p);
+  steps=Math.max(0,steps-1);allowOnlyCenter=false;focusKey=null;roundActive=snapshot()!==initial;
+  draw();update();E('flag').textContent=roundActive?'PLAYING':'READY';E('status').textContent='';
+};
+E('hintBtn').onclick=()=>{
+  if(!roundActive||!sol.length||hintsUsed>=roundRules.hints||animT||lastHintState===snapshot())return;
+  cancelPendingClick();const m=inverseMove(sol[sol.length-1]);
+  if(!candidates().some(c=>c.key===m.key))return;
+  lastHintState=snapshot();hintsUsed++;focusKey=m.key;draw();
+  E('flag').textContent=m.kind==='flip'?'HINT: FLIP':m.dir===1?'HINT: ↻':'HINT: ↺';
+  E('status').textContent=m.kind==='flip'?'Double-click the highlighted pivot to flip':m.dir===1?'Rotate the highlighted pivot clockwise':'Rotate the highlighted pivot counterclockwise';
+  if(!keepSolution())clearSolutionTrail();update();
+};
 E('showTargets').onclick=()=>{show=!show; draw()};
-buildUI();wireTabs();initGL();live();initialize(3);bgStart();
+buildUI();wireTabs();initGL();live();initialize(n);describeDifficulty();bgStart();
 })();
 </script>
 </body>
